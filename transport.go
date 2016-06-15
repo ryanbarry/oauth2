@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 )
 
@@ -43,7 +44,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	req2 := cloneRequest(req) // per RoundTripper contract
-	token.SetAuthHeader(req2)
+	//token.SetAuthHeader(req2)
+	if len(req2.URL.RawQuery) > 0 {
+		req2.URL.RawQuery = "oauth_token=" + token.AccessToken
+	} else {
+		req2.URL.RawQuery = "&oauth_token=" + token.AccessToken
+	}
 	t.setModReq(req, req2)
 	res, err := t.base().RoundTrip(req2)
 	if err != nil {
@@ -93,6 +99,7 @@ func (t *Transport) setModReq(orig, mod *http.Request) {
 
 // cloneRequest returns a clone of the provided *http.Request.
 // The clone is a shallow copy of the struct and its Header map.
+// also its url
 func cloneRequest(r *http.Request) *http.Request {
 	// shallow copy of the struct
 	r2 := new(http.Request)
@@ -102,6 +109,15 @@ func cloneRequest(r *http.Request) *http.Request {
 	for k, s := range r.Header {
 		r2.Header[k] = append([]string(nil), s...)
 	}
+	// deep copy of URL
+	url2 := new(url.URL)
+	*url2 = *r.URL
+	if url2.User != nil {
+		url2.User = new(url.Userinfo)
+		*url2.User = *r.URL.User
+	}
+	r2.URL = url2
+
 	return r2
 }
 
